@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>TicketTailor Register</title>
+</head>
+<body>
+    <h1>Register</h1>
+
+    <input id="email" placeholder="Email"><br>
+    <input id="password" type="password" placeholder="Password"><br>
+    <input id="name" placeholder="Name"><br>
+    <input id="description" placeholder="Description"><br>
+    <input id="club" placeholder="Club"><br>
+
+    <button onclick="register()">Register</button>
+
+    <p><a href="/login.html">Back to login</a></p>
+
+    <pre id="message"></pre>
+
+    <script>
+        async function register() {
+            const response = await fetch("/api/v1/auth/register", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    email: document.getElementById("email").value,
+                    password: document.getElementById("password").value,
+                    name: document.getElementById("name").value,
+                    description: document.getElementById("description").value,
+                    club: document.getElementById("club").value
+                })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                window.location.href = "/login.html";
+            } else {
+                document.getElementById("message").textContent =
+                    JSON.stringify(data, null, 2);
+            }
+        }
+    </script>
+</body>
+</html>
