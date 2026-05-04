@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>TicketTailor Map Module</title>
+
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet/dist/leaflet.css"
+  />
+
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+    }
+
+    .controls {
+      padding: 12px;
+      background: #f5f5f5;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    #map {
+      height: calc(100vh - 56px);
+      width: 100%;
+    }
+
+    select, button {
+      padding: 6px 10px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="controls">
+    <label>
+      Category:
+      <select id="category">
+        <option value="All">All</option>
+        <option value="Gaming">Gaming</option>
+        <option value="Music">Music</option>
+        <option value="Food">Food</option>
+        <option value="Sports">Sports</option>
+      </select>
+    </label>
+
+    <label>
+      Radius:
+      <select id="radius">
+        <option value="0.5">500 m</option>
+        <option value="1">1 km</option>
+        <option value="2" selected>2 km</option>
+        <option value="5">5 km</option>
+      </select>
+    </label>
+
+    <button onclick="loadEvents()">Search</button>
+  </div>
+
+  <div id="map"></div>
+
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+  <script>
+    const userLat = -27.4810;
+    const userLng = 153.0235;
+
+    const map = L.map('map').setView([userLat, userLng], 15);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    L.marker([userLat, userLng])
+      .addTo(map)
+      .bindPopup('Search centre: South Bank');
+
+    let eventMarkers = [];
+
+    async function loadEvents() {
+      for (const marker of eventMarkers) {
+        map.removeLayer(marker);
+      }
+
+      eventMarkers = [];
+
+      const category = document.getElementById('category').value;
+      const radius = document.getElementById('radius').value;
+
+      const url = `http://localhost:8000/api/events?lat=${userLat}&lng=${userLng}&radius=${radius}&category=${category}`;
+
+      const response = await fetch(url);
+      const events = await response.json();
+
+      for (const event of events) {
+        const marker = L.marker([event.latitude, event.longitude])
+          .addTo(map)
+          .bindPopup(`
+            <b>${event.title}</b><br>
+            Category: ${event.category}<br>
+            Location: ${event.location_name}<br>
+            Distance: ${event.distance_km} km
+          `);
+
+        eventMarkers.push(marker);
+      }
+    }
+
+    loadEvents();
+  </script>
+</body>
+</html>
