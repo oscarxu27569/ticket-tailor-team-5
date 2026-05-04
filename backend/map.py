@@ -1,17 +1,9 @@
-from fastapi import FastAPI, Query
-from fastapi.middleware.cors import CORSMiddleware
+from flask import Flask, request, jsonify
+from flask_cors import CORS
 from math import radians, sin, cos, sqrt, atan2
-from typing import Optional
 
-app = FastAPI()
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+app = Flask(__name__)
+CORS(app)
 
 events = [
     {
@@ -51,6 +43,7 @@ events = [
 
 def haversine_km(lat1, lon1, lat2, lon2):
     r = 6371
+
     lat1 = radians(lat1)
     lon1 = radians(lon1)
     lat2 = radians(lat2)
@@ -65,13 +58,16 @@ def haversine_km(lat1, lon1, lat2, lon2):
     return r * c
 
 
-@app.get("/api/events")
-def get_events(
-    lat: float = Query(...),
-    lng: float = Query(...),
-    radius: float = Query(5),
-    category: Optional[str] = Query(None),
-):
+@app.route("/api/events", methods=["GET"])
+def get_events():
+    try:
+        lat = float(request.args.get("lat"))
+        lng = float(request.args.get("lng"))
+        radius = float(request.args.get("radius", 5))
+        category = request.args.get("category", None)
+    except (TypeError, ValueError):
+        return jsonify({"error": "Invalid or missing query parameters"}), 400
+
     results = []
 
     for event in events:
@@ -82,11 +78,19 @@ def get_events(
             event["longitude"],
         )
 
-        category_matches = category is None or category == "All" or event["category"] == category
+        category_matches = (
+            category is None
+            or category == "All"
+            or event["category"] == category
+        )
 
         if distance <= radius and category_matches:
             item = event.copy()
             item["distance_km"] = round(distance, 2)
             results.append(item)
 
-    return results
+    return jsonify(results)
+
+
+if __name__ == "__main__":
+    app.run(debug=True, port=8000)
