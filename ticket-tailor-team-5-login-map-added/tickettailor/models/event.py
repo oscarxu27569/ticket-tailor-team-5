@@ -28,7 +28,7 @@ class Event(db.Model):
 
     organiser = db.relationship("User", backref="events")
 
-    def to_dict(self, distance_km=None):
+    def to_dict(self, distance_km=None, user=None):
         data = {
             "id": self.id,
             "title": self.title,
@@ -48,7 +48,12 @@ class Event(db.Model):
             "organiser_id": self.organiser_id,
             "public_at": format_datetime(self.public_at),
             "created_at": format_datetime(self.created_at),
+            "is_organiser": user is not None and self.organiser_id == user.id,
+            "is_rsvped": False,
         }
+
+        if user is not None:
+            data["is_rsvped"] = any(rsvp.user_id == user.id for rsvp in self.rsvps)
 
         if distance_km is not None:
             data["distance_km"] = round(distance_km, 3)

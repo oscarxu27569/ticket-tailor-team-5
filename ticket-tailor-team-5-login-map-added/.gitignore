@@ -1,0 +1,6 @@
+.DS_Store
+frontend/dist/
+frontend/node_modules/
+instance/*.db
+__pycache__/
+*.py[cod]

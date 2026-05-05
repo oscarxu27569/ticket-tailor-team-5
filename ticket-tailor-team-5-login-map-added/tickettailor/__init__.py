@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 from flask import Flask, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
@@ -7,7 +8,10 @@ db = SQLAlchemy()
 
 
 def create_app(test_config=None):
-    app = Flask(__name__, static_folder="../frontend", static_url_path="")
+    frontend_dir = Path(__file__).resolve().parent.parent / "frontend"
+    frontend_dist = frontend_dir / "dist"
+    static_folder = frontend_dist if frontend_dist.exists() else frontend_dir
+    app = Flask(__name__, static_folder=str(static_folder), static_url_path="")
 
     app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///app.db"
     if test_config:
@@ -23,29 +27,52 @@ def create_app(test_config=None):
 
     @app.route("/")
     def index():
-        return send_from_directory(app.static_folder, "login.html")
+        return send_react_app(app)
 
+    @app.route("/login")
     @app.route("/login.html")
     def login_page():
-        return send_from_directory(app.static_folder, "login.html")
+        return send_react_app(app)
 
+    @app.route("/register")
     @app.route("/register.html")
     def register_page():
-        return send_from_directory(app.static_folder, "register.html")
+        return send_react_app(app)
 
+    @app.route("/profile")
     @app.route("/profile.html")
     def profile_page():
-        return send_from_directory(app.static_folder, "profile.html")
+        return send_react_app(app)
 
+    @app.route("/map")
     @app.route("/map.html")
     def map_page():
-        return send_from_directory(app.static_folder, "map.html")
+        return send_react_app(app)
+
+    @app.route("/events/new")
+    @app.route("/events/<int:event_id>")
+    @app.route("/events/<int:event_id>/edit")
+    def event_page(event_id=None):
+        return send_react_app(app)
+
+    @app.route("/notifications")
+    def notifications_page():
+        return send_react_app(app)
 
     with app.app_context():
+        import_models()
         db.create_all()
         seed_demo_events()
 
     return app
+
+
+def send_react_app(app):
+    return send_from_directory(app.static_folder, "index.html")
+
+
+def import_models():
+    from .models import event, notification, rsvp, user  # noqa: F401
 
 
 def seed_demo_events():
