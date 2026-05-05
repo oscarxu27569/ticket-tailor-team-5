@@ -651,6 +651,56 @@ textarea:focus {
   box-shadow: 0 0 0 4px rgba(247, 201, 72, 0.28);
 }
 
+.user-location-marker {
+  display: grid;
+  place-items: center;
+  border: 3px solid #ffffff;
+  border-radius: 999px;
+  background: #2f80ed;
+  box-shadow:
+    0 0 0 5px rgba(47, 128, 237, 0.22),
+    0 8px 18px rgba(24, 41, 54, 0.24);
+}
+
+.user-location-marker span {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #ffffff;
+}
+
+.location-control button {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 0;
+  background: #ffffff;
+  color: #203541;
+  font-size: 21px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.location-control button:hover {
+  background: #f4f7f9;
+}
+
+.location-control button:disabled {
+  cursor: wait;
+  color: #7b8a99;
+}
+
+.location-control button.is-loading {
+  animation: locate-spin 900ms linear infinite;
+}
+
+@keyframes locate-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .popup-content {
   min-width: 180px;
   line-height: 1.5;

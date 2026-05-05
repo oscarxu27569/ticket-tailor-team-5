@@ -3,7 +3,7 @@ import L from "leaflet";
 import { apiRequest, goTo } from "../api.js";
 import TopNav from "../components/TopNav.jsx";
 
-const SEARCH_CENTRE = [-27.4975, 153.0137];
+const DEFAULT_SEARCH_CENTRE = [-27.4975, 153.0137];
 const DEFAULT_ZOOM = 15;
 const categories = [
   "All",
@@ -20,11 +20,33 @@ export default function MapPage() {
   const mapElementRef = useRef(null);
   const mapRef = useRef(null);
   const markersRef = useRef([]);
+  const centreMarkerRef = useRef(null);
+  const userMarkerRef = useRef(null);
+  const locateControlRef = useRef(null);
+  const userLocationRef = useRef(null);
+  const isLocatingRef = useRef(false);
+  const returnToCurrentLocationRef = useRef(null);
   const [events, setEvents] = useState([]);
   const [category, setCategory] = useState("All");
   const [radius, setRadius] = useState("2");
   const [search, setSearch] = useState("");
+  const [searchCentre, setSearchCentre] = useState(DEFAULT_SEARCH_CENTRE);
+  const [userLocation, setUserLocation] = useState(null);
+  const [isLocating, setIsLocating] = useState(false);
   const [status, setStatus] = useState("Loading events...");
+
+  useEffect(() => {
+    userLocationRef.current = userLocation;
+  }, [userLocation]);
+
+  useEffect(() => {
+    isLocatingRef.current = isLocating;
+    setLocateControlLoading(isLocating);
+  }, [isLocating]);
+
+  useEffect(() => {
+    returnToCurrentLocationRef.current = returnToCurrentLocation;
+  });
 
   const filteredEvents = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -46,7 +68,7 @@ export default function MapPage() {
     }
 
     mapRef.current = L.map(mapElementRef.current).setView(
-      SEARCH_CENTRE,
+      DEFAULT_SEARCH_CENTRE,
       DEFAULT_ZOOM
     );
 
@@ -55,11 +77,61 @@ export default function MapPage() {
       attribution: "&copy; OpenStreetMap contributors"
     }).addTo(mapRef.current);
 
-    L.marker(SEARCH_CENTRE, {
+    centreMarkerRef.current = L.marker(DEFAULT_SEARCH_CENTRE, {
       icon: createCentreIcon()
     })
       .addTo(mapRef.current)
-      .bindPopup("Search centre: UQ St Lucia");
+      .bindPopup("Search centre");
+
+    locateControlRef.current = L.control({ position: "topleft" });
+    locateControlRef.current.onAdd = () => {
+      const container = L.DomUtil.create(
+        "div",
+        "leaflet-bar leaflet-control location-control"
+      );
+      const button = L.DomUtil.create("button", "", container);
+      button.type = "button";
+      button.title = "Use current location";
+      button.setAttribute("aria-label", "Use current location");
+      button.innerHTML = "⌖";
+
+      L.DomEvent.disableClickPropagation(container);
+      L.DomEvent.disableScrollPropagation(container);
+      L.DomEvent.on(button, "click", (event) => {
+        L.DomEvent.preventDefault(event);
+        returnToCurrentLocationRef.current?.();
+      });
+
+      return container;
+    };
+    locateControlRef.current.addTo(mapRef.current);
+
+    if ("geolocation" in navigator) {
+      const watchId = navigator.geolocation.watchPosition(
+        (position) => {
+          const location = [
+            position.coords.latitude,
+            position.coords.longitude
+          ];
+          setUserLocation(location);
+          updateUserMarker(location);
+        },
+      (error) => {
+        setStatus(getLocationErrorMessage(error));
+      },
+        {
+          enableHighAccuracy: true,
+          maximumAge: 15000,
+          timeout: 10000
+        }
+      );
+
+      return () => {
+        navigator.geolocation.clearWatch(watchId);
+        mapRef.current?.remove();
+        mapRef.current = null;
+      };
+    }
 
     return () => {
       mapRef.current?.remove();
@@ -71,8 +143,8 @@ export default function MapPage() {
     setStatus("Loading events...");
 
     const params = new URLSearchParams({
-      lat: String(SEARCH_CENTRE[0]),
-      lng: String(SEARCH_CENTRE[1]),
+      lat: String(searchCentre[0]),
+      lng: String(searchCentre[1]),
       radius
     });
 
@@ -97,7 +169,7 @@ export default function MapPage() {
       setEvents([]);
       setStatus(error.message);
     }
-  }, [category, radius]);
+  }, [category, radius, searchCentre]);
 
   useEffect(() => {
     loadEvents();
@@ -140,15 +212,104 @@ export default function MapPage() {
       });
       setStatus(`${filteredEvents.length} event(s) displayed.`);
     } else {
-      map.setView(SEARCH_CENTRE, DEFAULT_ZOOM);
+      map.setView(searchCentre, DEFAULT_ZOOM);
       setStatus("No events match the current filters.");
     }
-  }, [filteredEvents]);
+  }, [filteredEvents, searchCentre]);
+
+  useEffect(() => {
+    if (!mapRef.current || !centreMarkerRef.current) {
+      return;
+    }
+
+    centreMarkerRef.current.setLatLng(searchCentre);
+  }, [searchCentre]);
 
   function resetFilters() {
     setCategory("All");
     setRadius("2");
     setSearch("");
+  }
+
+  function updateUserMarker(location) {
+    if (!mapRef.current) {
+      return;
+    }
+
+    if (!userMarkerRef.current) {
+      userMarkerRef.current = L.marker(location, {
+        icon: createUserLocationIcon()
+      })
+        .addTo(mapRef.current)
+        .bindPopup("Your current location");
+      return;
+    }
+
+    userMarkerRef.current.setLatLng(location);
+  }
+
+  function useCurrentLocation() {
+    if (!("geolocation" in navigator)) {
+      setStatus("Your browser does not support location access.");
+      return;
+    }
+
+    setIsLocating(true);
+    setStatus("Finding your current location...");
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const location = [
+          position.coords.latitude,
+          position.coords.longitude
+        ];
+        setUserLocation(location);
+        setSearchCentre(location);
+        updateUserMarker(location);
+        mapRef.current?.setView(location, 16);
+        setStatus("Search centre moved to your current location.");
+        setIsLocating(false);
+      },
+      (error) => {
+        setStatus(getLocationErrorMessage(error));
+        setIsLocating(false);
+      },
+      {
+        enableHighAccuracy: true,
+        maximumAge: 0,
+        timeout: 12000
+      }
+    );
+  }
+
+  function returnToCurrentLocation() {
+    if (isLocatingRef.current) {
+      return;
+    }
+
+    if (userLocationRef.current) {
+      setSearchCentre(userLocationRef.current);
+      mapRef.current?.setView(userLocationRef.current, 16);
+      setStatus("Returned to your current location.");
+      return;
+    }
+
+    useCurrentLocation();
+  }
+
+  function setLocateControlLoading(isLoading) {
+    const button = locateControlRef.current?.getContainer()?.querySelector("button");
+    if (!button) {
+      return;
+    }
+
+    button.disabled = isLoading;
+    button.classList.toggle("is-loading", isLoading);
+    button.title = isLoading ? "Finding current location..." : "Use current location";
+    button.setAttribute(
+      "aria-label",
+      isLoading ? "Finding current location" : "Use current location"
+    );
   }
 
   function focusEvent(event) {
@@ -330,6 +491,16 @@ function createCentreIcon() {
   });
 }
 
+function createUserLocationIcon() {
+  return L.divIcon({
+    className: "user-location-marker",
+    html: "<span></span>",
+    iconSize: [26, 26],
+    iconAnchor: [13, 13],
+    popupAnchor: [0, -13]
+  });
+}
+
 function createPopupHtml(event) {
   return `
     <div class="popup-content">
@@ -381,4 +552,20 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+function getLocationErrorMessage(error) {
+  if (error.code === error.PERMISSION_DENIED) {
+    return "Location permission was denied. Allow location access to use current location.";
+  }
+
+  if (error.code === error.POSITION_UNAVAILABLE) {
+    return "Current location is unavailable right now.";
+  }
+
+  if (error.code === error.TIMEOUT) {
+    return "Finding your current location timed out.";
+  }
+
+  return "Could not read your current location.";
 }
