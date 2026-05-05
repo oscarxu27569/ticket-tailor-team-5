@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TicketTailor Event Map</title>
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="/map.css" />
+</head>
+<body>
+  <header class="page-header">
+    <h1>TicketTailor Event Map</h1>
+    <p>Find university events by category and search radius.</p>
+  </header>
+
+  <main>
+    <section class="controls">
+      <label for="category">
+        Category
+        <select id="category">
+          <option value="All">All</option>
+          <option value="Gaming">Gaming</option>
+          <option value="Music">Music</option>
+          <option value="Food">Food</option>
+          <option value="Sports">Sports</option>
+          <option value="Academic">Academic</option>
+          <option value="Career">Career</option>
+          <option value="Culture">Culture</option>
+        </select>
+      </label>
+
+      <label for="radius">
+        Radius
+        <select id="radius">
+          <option value="0.5">500 m</option>
+          <option value="1">1 km</option>
+          <option value="2" selected>2 km</option>
+          <option value="5">5 km</option>
+          <option value="10">10 km</option>
+        </select>
+      </label>
+
+      <label for="search">
+        Search
+        <input id="search" type="text" placeholder="Search title or location" />
+      </label>
+
+      <button id="search-button" type="button">Search</button>
+      <button id="reset-button" type="button">Reset</button>
+    </section>
+
+    <section class="status-bar">
+      <span id="status-message">Loading events...</span>
+    </section>
+
+    <section class="map-layout">
+      <div id="map"></div>
+
+      <aside class="event-panel">
+        <h2>Events</h2>
+        <div id="event-list" class="event-list">
+          <p class="empty-message">No events loaded yet.</p>
+        </div>
+      </aside>
+    </section>
+  </main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="/map.js"></script>
+</body>
+</html>
