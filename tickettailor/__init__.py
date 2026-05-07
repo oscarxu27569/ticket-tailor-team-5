@@ -14,6 +14,9 @@ def create_app():
     from .views.auth import auth_bp
     app.register_blueprint(auth_bp)
 
+    from .views.events import events_bp
+    app.register_blueprint(events_bp)
+
     @app.route("/")
     def index():
         return send_from_directory(app.static_folder, "login.html")

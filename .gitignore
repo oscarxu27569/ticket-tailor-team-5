@@ -1,0 +1,33 @@
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Flask / local database
+instance/
+*.db
+*.sqlite
+*.sqlite3
+
+# React / Vite
+frontend-react/node_modules/
+frontend-react/dist/
+frontend-react/.vite/
+frontend-react/.env
+frontend-react/.env.*
+!frontend-react/.env.example
+
+# Logs and OS/editor files
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
