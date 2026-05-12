@@ -7,6 +7,7 @@ from sqlalchemy import or_
 from .. import db
 from ..models.event import Event
 from .auth import get_current_user
+from ..models.rsvp import RSVP
 
 
 events_bp = Blueprint("events", __name__, url_prefix="/api/v1/events")
@@ -53,7 +54,7 @@ def parse_float(value, field_name):
         raise ValueError(f"Invalid {field_name}") from exc
 
 
-def serialize_event(event, distance_km=None):
+def serialize_event(event, distance_km=None, user=None):
     item = {
         "id": event.id,
         "title": event.title,
@@ -69,6 +70,7 @@ def serialize_event(event, distance_km=None):
         "visibility": event.visibility,
         "attendee_count": event.attendee_count,
         "creator_id": event.creator_id,
+        "joined_by_current_user": RSVP.query.filter_by(user_id=user.id, event_id=event.id).first() is not None if user else False,
     }
 
     if distance_km is not None:
@@ -84,6 +86,15 @@ def visible_events_query(user):
     return Event.query.filter(
         or_(Event.visibility == "public", Event.creator_id == user.id)
     )
+
+
+def event_time_conflicts(first_event, second_event):
+    first_start = first_event.start_time
+    first_end = first_event.end_time or first_event.start_time
+    second_start = second_event.start_time
+    second_end = second_event.end_time or second_event.start_time
+
+    return first_start < second_end and second_start < first_end
 
 
 @events_bp.route("", methods=["POST"])
@@ -149,7 +160,7 @@ def create_event():
     db.session.add(event)
     db.session.commit()
 
-    return jsonify(serialize_event(event)), 201
+    return jsonify(serialize_event(event, user=user)), 201
 
 
 @events_bp.route("/map", methods=["GET"])
@@ -172,6 +183,62 @@ def get_map_events():
     for event in query.order_by(Event.start_time.asc()).all():
         distance = haversine_km(lat, lng, event.latitude, event.longitude)
         if distance <= radius:
-            results.append(serialize_event(event, distance))
+            results.append(serialize_event(event, distance, user=user))
 
     return jsonify(results), 200
+
+@events_bp.route("/<int:event_id>/rsvp", methods=["POST"])
+def join_event(event_id):
+    user = get_current_user()
+
+    if not user:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    event = Event.query.get(event_id)
+
+    if not event:
+        return jsonify({"error": "Event not found"}), 404
+
+    if event.creator_id == user.id:
+        return jsonify({"error": "You cannot join your own event"}), 400
+
+    existing_rsvp = RSVP.query.filter_by(
+        user_id=user.id,
+        event_id=event.id
+    ).first()
+
+    if existing_rsvp:
+        return jsonify({
+            "message": "You have already joined this event",
+            "attendee_count": event.attendee_count,
+            "joined_by_current_user": True
+        }), 200
+
+    joined_rsvps = RSVP.query.filter_by(user_id=user.id).all()
+    joined_event_ids = [item.event_id for item in joined_rsvps]
+    joined_events = Event.query.filter(Event.id.in_(joined_event_ids)).all() if joined_event_ids else []
+
+    for joined_event in joined_events:
+        if event_time_conflicts(event, joined_event):
+            return jsonify({
+                "error": f"This event conflicts with {joined_event.title}",
+                "conflict_event_id": joined_event.id,
+                "conflict_event_title": joined_event.title
+            }), 409
+
+    rsvp = RSVP(
+        user_id=user.id,
+        event_id=event.id
+    )
+
+    event.attendee_count = (event.attendee_count or 0) + 1
+
+    db.session.add(rsvp)
+    db.session.commit()
+
+    return jsonify({
+        "message": "Joined event successfully",
+        "event_id": event.id,
+        "attendee_count": event.attendee_count,
+        "joined_by_current_user": True
+    }), 201
